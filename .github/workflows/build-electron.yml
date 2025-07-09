@@ -1,0 +1,82 @@
+name: Build Electron App
+
+
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: build-electron-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            artifact: Copilot-Desktop-win
+            outdir: dist/Copilot-Desktop-win32-x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            artifact: Copilot-Desktop-linux
+            outdir: dist/Copilot-Desktop-linux-x64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            artifact: Copilot-Desktop-macos-x64
+            outdir: dist/Copilot-Desktop-darwin-x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            artifact: Copilot-Desktop-macos-arm64
+            outdir: dist/Copilot-Desktop-darwin-arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Package Electron app
+        run: |
+          npx electron-packager . Copilot-Desktop --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --icon=src/icon.ico --out=dist --overwrite
+
+      - name: Upload packaged app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.outdir }}
+          retention-days: 1
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/Copilot-Desktop-win/*
+            dist/Copilot-Desktop-linux/*
+            dist/Copilot-Desktop-macos-x64/*
+            dist/Copilot-Desktop-macos-arm64/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
