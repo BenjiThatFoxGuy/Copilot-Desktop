@@ -50,8 +50,21 @@ jobs:
         run: npm install
 
       - name: Package Electron app
+        shell: bash
         run: |
-          npx electron-packager . Copilot-Desktop --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --icon=src/icon.ico --out=dist --overwrite
+          if [ "${{ matrix.platform }}" = "win32" ]; then
+            npm run package:win
+            7z a dist/Copilot-Desktop-win.zip dist/Copilot-Desktop-win32-x64/*
+          elif [ "${{ matrix.platform }}" = "linux" ]; then
+            npm run package:linux
+            zip -r dist/Copilot-Desktop-linux.zip dist/Copilot-Desktop-linux-x64
+          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "x64" ]; then
+            npm run package:mac:x64
+            zip -r dist/Copilot-Desktop-macos-x64.zip dist/Copilot-Desktop-darwin-x64
+          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
+            npm run package:mac:arm64
+            zip -r dist/Copilot-Desktop-macos-arm64.zip dist/Copilot-Desktop-darwin-arm64
+          fi
 
       - name: Upload packaged app artifact
         uses: actions/upload-artifact@v4
