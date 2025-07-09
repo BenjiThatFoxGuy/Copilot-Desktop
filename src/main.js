@@ -386,6 +386,20 @@ function createWindow() {
 
   // Handle Ctrl/Cmd+B to trigger sidebar button
   win.webContents.on('before-input-event', (event, input) => {
+    // Ctrl+Q: Quit app (all platforms)
+    if ((input.control || input.meta) && !input.alt && !input.shift && input.key.toLowerCase() === 'q') {
+      app.quitting = true;
+      app.quit();
+      event.preventDefault();
+      return;
+    }
+    // Ctrl+Q/Cmd+Q: Quit the app
+    if ((input.control || input.meta) && !input.alt && !input.shift && input.key.toLowerCase() === 'q') {
+      app.quitting = true;
+      app.quit();
+      event.preventDefault();
+      return;
+    }
     // Ctrl+Plus/Minus/0 for zoom
     if ((input.control || input.meta) && !input.alt && !input.shift) {
       if (input.key === '=' || input.key === '+') {
