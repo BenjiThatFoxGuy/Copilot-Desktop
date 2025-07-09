@@ -7,10 +7,12 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('Copilot Desktop');
 }
 
-// Configure auto-updater
-autoUpdater.checkForUpdatesAndNotify();
-
 // Auto-updater event handlers
+
+app.whenReady().then(() => {
+  createWindow(); // Ensure the main window is created
+  autoUpdater.checkForUpdatesAndNotify(); // Start checking for updates after window creation
+});
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
 });
