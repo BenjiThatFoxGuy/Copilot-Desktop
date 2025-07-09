@@ -15,6 +15,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node test/test-main.js",
+    "verify": "node test/verify-autoupdate.js",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
