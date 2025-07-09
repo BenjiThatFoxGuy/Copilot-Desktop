@@ -15,16 +15,7 @@ autoUpdater.on('checking-for-update', () => {
 
 autoUpdater.on('update-available', (info) => {
   console.log('Update available:', info);
-  if (win) {
-    dialog.showMessageBox(win, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) is available. It will be downloaded in the background.`,
-      buttons: ['OK']
-    });
-  }
-  // Quit app to allow update installation
-  app.quit();
+  // No user prompt here to avoid duplicate dialogs
 });
 
 autoUpdater.on('update-not-available', (info) => {
@@ -45,7 +36,7 @@ autoUpdater.on('download-progress', (progressObj) => {
   console.log(log_message);
 });
 
-autoUpdater.on('update-downloaded', (info) => {
+autoUpdater.once('update-downloaded', (info) => {
   console.log('Update downloaded:', info);
   if (win) {
     dialog.showMessageBox(win, {
