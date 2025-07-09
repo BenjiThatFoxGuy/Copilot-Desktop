@@ -98,6 +98,16 @@ function createWindow() {
 
 
   // Load GitHub Copilot web interface
+  // Enable visual zoom via Ctrl+Scroll
+  win.webContents.setVisualZoomLevelLimits(1, 3).catch(() => {});
+  win.webContents.on('zoom-changed', (event, zoomDirection) => {
+    let current = win.webContents.getZoomLevel();
+    if (zoomDirection === 'in') {
+      win.webContents.setZoomLevel(current + 1);
+    } else if (zoomDirection === 'out') {
+      win.webContents.setZoomLevel(current - 1);
+    }
+  });
   win.loadURL('https://github.com/copilot');
 
 
@@ -376,6 +386,21 @@ function createWindow() {
 
   // Handle Ctrl/Cmd+B to trigger sidebar button
   win.webContents.on('before-input-event', (event, input) => {
+    // Ctrl+Plus/Minus/0 for zoom
+    if ((input.control || input.meta) && !input.alt && !input.shift) {
+      if (input.key === '=' || input.key === '+') {
+        const current = win.webContents.getZoomLevel();
+        win.webContents.setZoomLevel(current + 1);
+        event.preventDefault();
+      } else if (input.key === '-' || input.key === '_') {
+        const current = win.webContents.getZoomLevel();
+        win.webContents.setZoomLevel(current - 1);
+        event.preventDefault();
+      } else if (input.key === '0') {
+        win.webContents.setZoomLevel(0);
+        event.preventDefault();
+      }
+    }
     if (input.key.toLowerCase() === 'b' && (input.control || input.meta)) {
       win.webContents.executeJavaScript(
         'document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > aside > div.Sidebar-module__header--uOLk8 > button").click();'
@@ -387,12 +412,12 @@ function createWindow() {
       win.webContents.executeJavaScript(`
         (function() {
         // Try header toolbar span, fallback to footer toolbar button
-        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
-        if (!span) {
-          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        let btn = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        if (!btn) {
+          btn = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
         }
-        if (span) {
-          span.click();
+        if (btn) {
+          btn.click();
             setTimeout(() => {
               const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
               const upload = candidates.find(el => el.textContent && el.textContent.trim() === 'Upload from computer');
