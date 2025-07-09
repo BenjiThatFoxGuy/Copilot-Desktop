@@ -1,6 +1,7 @@
-const { app, BrowserWindow, Tray, Menu, dialog, Notification } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, Notification, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
+const fs = require('fs');
 
 // Set appUserModelId for correct notification sender branding on Windows
 if (process.platform === 'win32') {
@@ -75,7 +76,7 @@ function createWindow() {
   // Ensure external links open in the user's browser
   win.webContents.setWindowOpenHandler(({ url }) => {
     // Open all non-Copilot and non-settings pages externally
-    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session')) {
+    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session') && !url.startsWith('https://github.com/marketplace')) {
       require('electron').shell.openExternal(url);
       return { action: 'deny' };
     }
@@ -89,7 +90,7 @@ function createWindow() {
       return;
     }
     // Allow in-app navigation for Copilot and settings pages, external otherwise
-    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session')) {
+    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session') && !url.startsWith('https://github.com/marketplace')) {
       event.preventDefault();
       require('electron').shell.openExternal(url);
     }
@@ -142,7 +143,19 @@ function createWindow() {
           click: () => {
             const focusedWin = BrowserWindow.getFocusedWindow();
             if (focusedWin) {
-              focusedWin.loadURL('https://github.com/settings/copilot/features');
+              focusedWin.loadURL('https://github.com/settings/copilot');
+            }
+          }
+        },
+        {
+          label: 'Toggle Sidebar',
+          accelerator: 'CommandOrControl+B',
+          click: () => {
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin) {
+              focusedWin.webContents.executeJavaScript(
+                'document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > aside > div.Sidebar-module__header--uOLk8 > button").click();'
+              );
             }
           }
         },
@@ -336,6 +349,125 @@ function createWindow() {
     `);
   });
 
+  // General context menu (copy/cut/paste/select all)
+  win.webContents.on('context-menu', (e, params) => {
+    const editMenu = Menu.buildFromTemplate([
+      { role: 'copy', enabled: params.editFlags.canCopy },
+      { role: 'cut', enabled: params.editFlags.canCut },
+      { role: 'paste', enabled: params.editFlags.canPaste },
+      { type: 'separator' },
+      { role: 'selectAll' }
+    ]);
+    editMenu.popup({ window: win });
+  });
+
+  // Inject contextmenu listener on GitHub logo to open custom menu
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.executeJavaScript(`
+      const logo = document.querySelector('header a[href="/"], header a[href="https://github.com/"]');
+      if (logo) {
+        logo.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          window.electronAPI.openLogoContextMenu();
+        });
+      }
+    `);
+  });
+
+  // Handle Ctrl/Cmd+B to trigger sidebar button
+  win.webContents.on('before-input-event', (event, input) => {
+    if (input.key.toLowerCase() === 'b' && (input.control || input.meta)) {
+      win.webContents.executeJavaScript(
+        'document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > aside > div.Sidebar-module__header--uOLk8 > button").click();'
+      );
+      event.preventDefault();
+    }
+    // Add Ctrl/Cmd+O to open upload dialog
+    if (input.key.toLowerCase() === 'o' && (input.control || input.meta)) {
+      win.webContents.executeJavaScript(`
+        (function() {
+        // Try header toolbar span, fallback to footer toolbar button
+        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
+        if (!span) {
+          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        }
+        if (span) {
+          span.click();
+            setTimeout(() => {
+              const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
+              const upload = candidates.find(el => el.textContent && el.textContent.trim() === 'Upload from computer');
+              if (upload) upload.click();
+            }, 200);
+          }
+        })();
+      `);
+      event.preventDefault();
+    }
+  // Ctrl/Cmd+Shift+E: Open Extension...
+  if (input.key.toLowerCase() === 'e' && (input.control || input.meta) && input.shift) {
+    win.webContents.executeJavaScript(`
+      (function() {
+        // Try header toolbar span, fallback to footer toolbar button
+        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
+        if (!span) {
+          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        }
+        if (span) {
+          span.click();
+          setTimeout(() => {
+            const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
+            const ext = candidates.find(el => el.textContent && el.textContent.trim().includes('Extension'));
+            if (ext) ext.click();
+          }, 200);
+        }
+      })();
+    `);
+    event.preventDefault();
+  }
+  // '/': Open Files, folder, and symbols...
+  if (input.key === '/' && !input.control && !input.meta && !input.shift && !input.alt) {
+    win.webContents.executeJavaScript(`
+      (function() {
+        // Try header toolbar span, fallback to footer toolbar button
+        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
+        if (!span) {
+          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        }
+        if (span) {
+          span.click();
+          setTimeout(() => {
+            const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
+            const files = candidates.find(el => el.textContent && el.textContent.trim().includes('Files, folder'));
+            if (files) files.click();
+          }, 200);
+        }
+      })();
+    `);
+    event.preventDefault();
+  }
+  // '`' or '~': Open Repositories...
+  if ((input.key === '`' || input.key === '~') && !input.control && !input.meta && !input.shift && !input.alt) {
+    win.webContents.executeJavaScript(`
+      (function() {
+        // Try header toolbar span, fallback to footer toolbar button
+        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
+        if (!span) {
+          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
+        }
+        if (span) {
+          span.click();
+          setTimeout(() => {
+            const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
+            const repos = candidates.find(el => el.textContent && el.textContent.trim().includes('Repositories'));
+            if (repos) repos.click();
+          }, 200);
+        }
+      })();
+    `);
+    event.preventDefault();
+  }
+});
+
   win.on('close', (event) => {
     if (!app.quitting) {
       event.preventDefault();
@@ -359,22 +491,24 @@ function createWindow() {
   });
 }
 
+// Handle logo element context menu
+ipcMain.on('logo-context-menu', (event) => {
+  const menu = Menu.buildFromTemplate([
+    { label: 'Restart', click: () => { app.relaunch(); app.exit(0); } },
+    { label: 'Exit', click: () => { app.quit(); } }
+  ]);
+  menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
+});
+
 app.whenReady().then(() => {
   createWindow();
   tray = new Tray(path.join(__dirname, 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show', click: () => {
-        if (win) {
-          win.show();
-          win.focus();
-        }
-      }
-    },
-    { label: 'Quit', click: () => {
-        app.quitting = true;
-        app.quit();
-      }
-    }
+    { label: 'Show', click: () => { if (win) { win.show(); win.focus(); } } },
+    { label: 'Restart', click: () => { app.relaunch(); app.exit(0); } },
+    { label: 'Clear User Data', click: () => { fs.rmSync(app.getPath('userData'), { recursive: true, force: true }); app.relaunch(); app.exit(0); } },
+    { type: 'separator' },
+    { label: 'Quit', click: () => { app.quitting = true; app.quit(); } }
   ]);
   tray.setToolTip('Copilot Desktop');
   tray.setContextMenu(contextMenu);
@@ -385,6 +519,7 @@ app.whenReady().then(() => {
       win.focus();
     }
   });
+
   // Auto-update on startup (packaged only)
   if (app.isPackaged) {
     autoUpdater.checkForUpdatesAndNotify();
