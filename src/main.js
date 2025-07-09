@@ -463,25 +463,14 @@ function createWindow() {
     `);
     event.preventDefault();
   }
-  // '/': Open Files, folder, and symbols... (only if not in a text input)
+  // '/': Focus the chat input (only if not in a text input already)
   if (input.key === '/' && !input.control && !input.meta && !input.shift && !input.alt) {
     win.webContents.executeJavaScript(`
       (function() {
         const ae = document.activeElement;
         if (ae && ((ae.tagName === 'INPUT' && !ae.readOnly && ae.type !== 'checkbox' && ae.type !== 'button' && ae.type !== 'radio') || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-        // Try header toolbar span, fallback to footer toolbar button
-        let span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__content--s7QoY > div > div > div.NewConversation-module__main--GVJMw > div > div > div.NewConversation-module__innerContainer--gDENn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button > span");
-        if (!span) {
-          span = document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > div > div.Layout-module__footer--raJHn > div > div:nth-child(1) > form > div.ChatInput-module__toolbar--ZtCiG > div.ChatInput-module__toolbarLeft--cjV2H > button");
-        }
-        if (span) {
-          span.click();
-          setTimeout(() => {
-            const candidates = Array.from(document.querySelectorAll('button, div, span, a'));
-            const files = candidates.find(el => el.textContent && el.textContent.trim().includes('Files, folder'));
-            if (files) files.click();
-          }, 200);
-        }
+        const chatInput = document.querySelector('#copilot-chat-textarea');
+        if (chatInput) chatInput.focus();
       })();
     `);
     event.preventDefault();
