@@ -82,8 +82,9 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  // Add Help menu with About and Check for Updates
-  const helpMenu = Menu.buildFromTemplate([
+  // Restore standard menubar and add Help
+  const defaultMenu = Menu.buildFromTemplate([
+    ...Menu.getApplicationMenu()?.items.map(item => item.toJSON()) || [],
     {
       label: 'Help',
       submenu: [
@@ -107,7 +108,10 @@ function createWindow() {
       ]
     }
   ]);
-  win.setMenu(Menu.buildFromTemplate([helpMenu.items[0]]));
+  Menu.setApplicationMenu(Menu.buildFromTemplate(defaultMenu));
+
+  // Set friendly window/taskbar title
+  win.setTitle('Copilot Desktop');
 
   // Inject JS to override Copilot title and show toast
   win.webContents.on('did-finish-load', () => {
@@ -149,6 +153,7 @@ function createWindow() {
       win.hide();
       // 4. Native notification on hide
       let msg = '';
+      let notifTitle = 'Copilot Desktop';
       if (process.platform === 'win32') {
         msg = 'Copilot Desktop is still running. You can find me in the system tray.';
       } else if (process.platform === 'darwin') {
@@ -156,7 +161,7 @@ function createWindow() {
       } else {
         msg = 'Copilot Desktop is still running. You can find me in the tray.';
       }
-      new Notification({ title: 'Copilot Desktop', body: msg }).show();
+      new Notification({ title: notifTitle, body: msg }).show();
     }
   });
 }
