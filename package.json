@@ -1,19 +1,55 @@
 {
   "name": "copilot-desktop",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Unofficial GUI for GitHub's Copilot, made in Electron.",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
-    "package:win": "electron-packager . Copilot-Desktop --platform=win32 --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && powershell Compress-Archive -Path Copilot-Desktop-win32-x64/* -DestinationPath Copilot-Desktop-win.zip && cd ..",
-    "package:linux": "electron-packager . Copilot-Desktop --platform=linux --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-linux.zip Copilot-Desktop-linux-x64 && cd ..",
-    "package:mac:x64": "electron-packager . Copilot-Desktop --platform=darwin --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-macos-x64.zip Copilot-Desktop-darwin-x64 && cd ..",
-    "package:mac:arm64": "electron-packager . Copilot-Desktop --platform=darwin --arch=arm64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-macos-arm64.zip Copilot-Desktop-darwin-arm64 && cd .."
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win --x64",
+    "dist:linux": "electron-builder --linux --x64",
+    "dist:mac": "electron-builder --mac --x64 --arm64"
   },
   "dependencies": {
     "electron": "^30.0.0",
-    "electron-packager": "^17.1.2",
-    "electron-updater": "^6.6.2",
-    "zip": "^1.2.0"
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "electron-builder": "^24.14.1"
+  },
+  "build": {
+    "appId": "au.benjithatfoxguy.copilotdesktop",
+    "productName": "Copilot Desktop",
+    "copyright": "Copyright © 2025 BenjiThatFoxGuy",
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "src"
+    },
+    "win": {
+      "icon": "src/icon.ico",
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+      "icon": "src/icon.ico",
+      "target": ["dmg", "zip"]
+    },
+    "linux": {
+      "icon": "src/icon.ico",
+      "target": ["AppImage", "deb", "zip"]
+    },
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ]
   }
 }

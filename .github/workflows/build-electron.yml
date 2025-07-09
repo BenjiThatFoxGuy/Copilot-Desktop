@@ -50,27 +50,26 @@ jobs:
         run: npm install
 
       - name: Package Electron app
-        shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "win32" ]; then
-            npm run package:win
-            7z a dist/Copilot-Desktop-win.zip dist/Copilot-Desktop-win32-x64/*
+            npm run dist:win
           elif [ "${{ matrix.platform }}" = "linux" ]; then
-            npm run package:linux
-            zip -r dist/Copilot-Desktop-linux.zip dist/Copilot-Desktop-linux-x64
-          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "x64" ]; then
-            npm run package:mac:x64
-            zip -r dist/Copilot-Desktop-macos-x64.zip dist/Copilot-Desktop-darwin-x64
-          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
-            npm run package:mac:arm64
-            zip -r dist/Copilot-Desktop-macos-arm64.zip dist/Copilot-Desktop-darwin-arm64
+            npm run dist:linux
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
+            npm run dist:mac
           fi
 
       - name: Upload packaged app artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}.zip
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.zip
+            dist/latest*.yml
           retention-days: 1
 
   release:
@@ -95,11 +94,7 @@ jobs:
           path: dist
 
       - name: Move all zip files to dist root for release upload
-        run: |
-          shopt -s globstar
-          for f in dist/**/*.zip; do
-            [ -f "$f" ] && mv "$f" dist/
-          done
+        run: echo "No need to move files; electron-builder outputs to dist/ root."
 
       - name: List files in dist for debugging
         run: |
@@ -111,10 +106,12 @@ jobs:
         with:
           token: ${{ secrets.GH_TOKEN }}
           files: |
-            dist/Copilot-Desktop-linux.zip
-            dist/Copilot-Desktop-macos-arm64.zip
-            dist/Copilot-Desktop-macos-x64.zip
-            dist/Copilot-Desktop-win.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.zip
+            dist/latest*.yml
 
   delete-artifacts:
     needs: release

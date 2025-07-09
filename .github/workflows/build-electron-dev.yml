@@ -49,11 +49,23 @@ jobs:
 
       - name: Package Electron app
         run: |
-          npx electron-packager . Copilot-Desktop --platform=${{ matrix.platform }} --arch=${{ matrix.arch }} --icon=src/icon.ico --out=dist --overwrite
+          if [ "${{ matrix.platform }}" = "win32" ]; then
+            npm run dist:win
+          elif [ "${{ matrix.platform }}" = "linux" ]; then
+            npm run dist:linux
+          elif [ "${{ matrix.platform }}" = "darwin" ]; then
+            npm run dist:mac
+          fi
 
       - name: Upload packaged app artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.outdir }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.zip
+            dist/latest*.yml
           retention-days: 1
