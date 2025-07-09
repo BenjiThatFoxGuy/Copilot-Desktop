@@ -70,7 +70,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.outdir }}
+          path: dist/${{ matrix.artifact }}.zip
           retention-days: 1
 
   release:
@@ -87,9 +87,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/Copilot-Desktop-win/*
-            dist/Copilot-Desktop-linux/*
-            dist/Copilot-Desktop-macos-x64/*
-            dist/Copilot-Desktop-macos-arm64/*
+            dist/Copilot-Desktop-win.zip
+            dist/Copilot-Desktop-linux.zip
+            dist/Copilot-Desktop-macos-x64.zip
+            dist/Copilot-Desktop-macos-arm64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
