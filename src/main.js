@@ -10,7 +10,6 @@ if (process.platform === 'win32') {
 // Auto-updater event handlers
 
 app.whenReady().then(() => {
-  createWindow(); // Ensure the main window is created
   autoUpdater.checkForUpdatesAndNotify(); // Start checking for updates after window creation
 });
 autoUpdater.on('checking-for-update', () => {
@@ -366,17 +365,6 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
-  
-  // Check for updates after app is ready (but not during development)
-  if (!app.isPackaged) {
-    console.log('Development mode - skipping auto-update check');
-  } else {
-    // Check for updates 3 seconds after startup
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-    }, 3000);
-  }
-  
   tray = new Tray(path.join(__dirname, 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show', click: () => {
@@ -401,6 +389,15 @@ app.whenReady().then(() => {
       win.focus();
     }
   });
+  // Check for updates after app is ready (but not during development)
+  if (!app.isPackaged) {
+    console.log('Development mode - skipping auto-update check');
+  } else {
+    // Check for updates 3 seconds after startup
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 3000);
+  }
 });
 
 app.on('window-all-closed', () => {
