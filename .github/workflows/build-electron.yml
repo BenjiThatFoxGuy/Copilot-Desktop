@@ -6,6 +6,12 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: '0.0.1'
 
 concurrency:
   group: ${{ github.ref }}
@@ -14,7 +20,7 @@ concurrency:
 jobs:
   # New electron-builder based builds with auto-update support
   build-with-autoupdate:
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     strategy:
       matrix:
         include:
@@ -22,10 +28,6 @@ jobs:
             platform: win32
             arch: x64
             command: npm run build:win
-          - os: macos-latest
-            platform: darwin
-            arch: universal
-            command: npm run build:mac
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -47,78 +49,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-autoupdate
-          path: |
-            dist/*.exe
-            dist/*.dmg
-            dist/*.zip
-            dist/latest*.yml
+          path: dist/*.exe
           retention-days: 5
 
-  # Legacy builds for backward compatibility
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            platform: win32
-            arch: x64
-            artifact: Copilot-Desktop-win
-            outdir: dist/Copilot-Desktop-win32-x64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            artifact: Copilot-Desktop-linux
-            outdir: dist/Copilot-Desktop-linux-x64
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-            artifact: Copilot-Desktop-macos-x64
-            outdir: dist/Copilot-Desktop-darwin-x64
-          - os: macos-latest
-            platform: darwin
-            arch: arm64
-            artifact: Copilot-Desktop-macos-arm64
-            outdir: dist/Copilot-Desktop-darwin-arm64
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Package Electron app
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform }}" = "win32" ]; then
-            npm run package:win
-            7z a dist/Copilot-Desktop-win.zip dist/Copilot-Desktop-win32-x64/*
-          elif [ "${{ matrix.platform }}" = "linux" ]; then
-            npm run package:linux
-            zip -r dist/Copilot-Desktop-linux.zip dist/Copilot-Desktop-linux-x64
-          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "x64" ]; then
-            npm run package:mac:x64
-            zip -r dist/Copilot-Desktop-macos-x64.zip dist/Copilot-Desktop-darwin-x64
-          elif [ "${{ matrix.platform }}" = "darwin" ] && [ "${{ matrix.arch }}" = "arm64" ]; then
-            npm run package:mac:arm64
-            zip -r dist/Copilot-Desktop-macos-arm64.zip dist/Copilot-Desktop-darwin-arm64
-          fi
-
-      - name: Upload packaged app artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}.zip
-          retention-days: 1
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: [build-with-autoupdate, build]
+    needs: [build-with-autoupdate]
     runs-on: ubuntu-latest
     steps:
       - name: Delete v0.0.1 release if present (for test/dev)
@@ -140,12 +77,7 @@ jobs:
       - name: Move all files to dist root for release upload
         run: |
           # Handle electron-builder generated files
-          find dist -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.yml" \) -exec mv {} dist/ \; || true
-          # Handle legacy zip files
-          shopt -s globstar
-          for f in dist/**/*.zip; do
-            [ -f "$f" ] && mv "$f" dist/
-          done
+          find dist -type f \( -name "*.exe" \) -exec mv {} dist/ \; || true
 
       - name: List files in dist for debugging
         run: |
@@ -158,9 +90,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             dist/*.exe
-            dist/*.dmg
-            dist/*.zip
-            dist/latest*.yml
           draft: false
           prerelease: false
 

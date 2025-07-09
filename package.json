@@ -1,12 +1,12 @@
 {
   "name": "copilot-desktop",
-  "version": "0.0.1",
+  "version": "0.1.7",
   "description": "Unofficial GUI for GitHub's Copilot, made in Electron.",
   "main": "src/main.js",
   "homepage": "https://github.com/BenjiThatFoxGuy/Copilot-Desktop",
   "author": {
     "name": "BenjiThatFoxGuy",
-    "email": "23064460+BenjiThatFoxGuy@users.noreply.github.com"
+    "email": "devsupport@benjifox.gay"
   },
   "repository": {
     "type": "git",
@@ -28,7 +28,7 @@
     "package:mac:arm64": "electron-packager . Copilot-Desktop --platform=darwin --arch=arm64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-macos-arm64.zip Copilot-Desktop-darwin-arm64 && cd .."
   },
   "build": {
-    "appId": "com.benjithatfoxguy.copilot-desktop",
+    "appId": "au.benjithatfoxguy.copilot-desktop",
     "productName": "Copilot Desktop",
     "directories": {
       "output": "dist"
