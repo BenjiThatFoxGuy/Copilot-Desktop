@@ -1,5 +1,8 @@
 # Copilot-Desktop
 
+- **Why?** Because Claude and ChatGPT have a Desktop. You don't have to use this, and this literally **just embeds github.com/copilot while redirecting any other parts of the UI to your browser**.
+- **Suggestions? Ideas?** Open an issue/submit a PR. I'll consider them. Just note, this is a personal project with no guarantees. But I'll be willing to collaborate.
+
 Unofficial GUI for GitHub Copilot, made in Electron.
 
 ## Getting Started

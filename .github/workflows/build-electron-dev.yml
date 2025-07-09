@@ -6,7 +6,7 @@ on:
       - dev
 
 concurrency:
-  group: build-electron-dev-${{ github.ref }}
+  group: ${{ github.ref }}
   cancel-in-progress: false
 
 jobs:

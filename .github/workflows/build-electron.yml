@@ -8,7 +8,7 @@ on:
       - 'v*'
 
 concurrency:
-  group: build-electron-${{ github.ref }}
+  group: ${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -78,18 +78,49 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Delete v0.0.1 release if present (for test/dev)
+        if: github.ref_name == 'v0.0.1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG="v0.0.1"
+          REPO="${{ github.repository }}"
+          echo "Deleting release for $TAG if it exists..."
+          gh release delete "$TAG" --repo "$REPO" --yes || true
+
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
 
+      - name: Move all zip files to dist root for release upload
+        run: |
+          shopt -s globstar
+          for f in dist/**/*.zip; do
+            [ -f "$f" ] && mv "$f" dist/
+          done
+
+      - name: List files in dist for debugging
+        run: |
+          echo "Listing all files in dist after moving zips:"
+          ls -lR dist
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GH_TOKEN }}
           files: |
-            dist/Copilot-Desktop-win.zip
             dist/Copilot-Desktop-linux.zip
-            dist/Copilot-Desktop-macos-x64.zip
             dist/Copilot-Desktop-macos-arm64.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            dist/Copilot-Desktop-macos-x64.zip
+            dist/Copilot-Desktop-win.zip
+
+  delete-artifacts:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: kolpav/purge-artifacts-action@v1
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          expire-in: 0 # Setting this to 0 will delete all artifacts

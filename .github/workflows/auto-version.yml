@@ -6,9 +6,10 @@ on:
       - main
     paths:
       - 'package.json'
+  workflow_dispatch:
 
 concurrency:
-  group: auto-version-${{ github.ref }}
+  group: ${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -16,6 +17,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
+    - name: Delete v0.0.1 release and tag if present (for test/dev)
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        set -e
+        VERSION=$(jq -r .version package.json)
+        if [ "$VERSION" = "0.0.1" ]; then
+          TAG="v0.0.1"
+          REPO="${{ github.repository }}"
+          echo "Deleting release for $TAG if it exists..."
+          gh release delete "$TAG" --repo "$REPO" --yes || true
+          echo "Fetching tags to ensure local tag exists..."
+          git fetch --tags
+          echo "Deleting tag $TAG if it exists..."
+          git tag -d "$TAG" || true
+          git push --delete origin "$TAG" || true
+        else
+          echo "package.json version is not 0.0.1, skipping dev release/tag deletion."
+        fi
     - uses: butlerlogic/action-autotag@1.1.2
       env:
         GITHUB_TOKEN: "${{ secrets.GH_TOKEN }}"
