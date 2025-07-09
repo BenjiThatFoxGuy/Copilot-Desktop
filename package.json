@@ -1,6 +1,6 @@
 {
   "name": "copilot-desktop",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Unofficial GUI for GitHub's Copilot, made in Electron.",
   "main": "src/main.js",
   "scripts": {
