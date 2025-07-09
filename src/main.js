@@ -26,6 +26,8 @@ autoUpdater.on('update-available', (info) => {
       buttons: ['OK']
     });
   }
+  // Quit app to allow update installation
+  app.quit();
 });
 
 autoUpdater.on('update-not-available', (info) => {
@@ -397,9 +399,10 @@ app.whenReady().then(() => {
   if (!app.isPackaged) {
     console.log('Development mode - skipping auto-update check');
   } else {
-    // Check for updates 3 seconds after startup
+    // Check for updates and then quit the app to allow updater to proceed
     setTimeout(() => {
       autoUpdater.checkForUpdatesAndNotify();
+      app.quit();
     }, 3000);
   }
 });
