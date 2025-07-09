@@ -3,17 +3,86 @@
   "version": "0.0.1",
   "description": "Unofficial GUI for GitHub's Copilot, made in Electron.",
   "main": "src/main.js",
+  "homepage": "https://github.com/BenjiThatFoxGuy/Copilot-Desktop",
+  "author": {
+    "name": "BenjiThatFoxGuy",
+    "email": "23064460+BenjiThatFoxGuy@users.noreply.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BenjiThatFoxGuy/Copilot-Desktop.git"
+  },
   "scripts": {
     "start": "electron .",
+    "test": "node test/test-main.js",
+    "verify": "node test/verify-autoupdate.js",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "echo 'Linux build disabled due to icon requirements'",
+    "dist": "electron-builder --publish=never",
+    "publish": "electron-builder --publish=always",
     "package:win": "electron-packager . Copilot-Desktop --platform=win32 --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && powershell Compress-Archive -Path Copilot-Desktop-win32-x64/* -DestinationPath Copilot-Desktop-win.zip && cd ..",
     "package:linux": "electron-packager . Copilot-Desktop --platform=linux --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-linux.zip Copilot-Desktop-linux-x64 && cd ..",
     "package:mac:x64": "electron-packager . Copilot-Desktop --platform=darwin --arch=x64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-macos-x64.zip Copilot-Desktop-darwin-x64 && cd ..",
     "package:mac:arm64": "electron-packager . Copilot-Desktop --platform=darwin --arch=arm64 --icon=src/icon.ico --out=dist --overwrite && cd dist && zip -r Copilot-Desktop-macos-arm64.zip Copilot-Desktop-darwin-arm64 && cd .."
   },
+  "build": {
+    "appId": "com.benjithatfoxguy.copilot-desktop",
+    "productName": "Copilot Desktop",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "main.js",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "BenjiThatFoxGuy",
+        "repo": "Copilot-Desktop"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "src/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "src/icon.ico",
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Development"
+    }
+  },
   "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
     "electron": "^30.0.0",
-    "electron-packager": "^17.1.2",
-    "electron-updater": "^6.6.2",
-    "zip": "^1.2.0"
+    "electron-builder": "^24.13.3"
   }
 }

@@ -5,6 +5,12 @@
 
 Unofficial GUI for GitHub Copilot, made in Electron.
 
+## Features
+
+- **Auto-Update Support**: The app now includes Squirrel-based auto-updates that check for new versions on startup and can be manually triggered via the Help menu.
+- **System Tray Integration**: The app minimizes to system tray when closed.
+- **GitHub Integration**: Embeds the GitHub Copilot interface directly.
+
 ## Getting Started
 
 1. Install dependencies:
@@ -15,8 +21,30 @@ Unofficial GUI for GitHub Copilot, made in Electron.
     ```sh
     npm start
     ```
+3. Build the app:
+    ```sh
+    npm run build
+    ```
+4. Test the app:
+    ```sh
+    npm test
+    ```
 
 This will open a desktop window embedding https://github.com/copilot.
+
+## Auto-Update
+
+The application includes automatic update functionality:
+
+- **Automatic Checking**: The app checks for updates 3 seconds after startup (production builds only)
+- **Manual Checking**: Use the "Check for Updates" option in the Help menu
+- **Update Process**: When an update is available, it downloads in the background and prompts for installation
+- **GitHub Releases**: Updates are distributed through GitHub releases
+
+## Development
+
+- Auto-update checks are disabled in development mode (when `app.isPackaged` is false)
+- Use `npm test` to verify the main application syntax and auto-update implementation
 
 ---
 

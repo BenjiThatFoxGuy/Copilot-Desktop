@@ -1,10 +1,64 @@
 const { app, BrowserWindow, Tray, Menu, dialog, Notification } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 // Set appUserModelId for correct notification sender branding on Windows
 if (process.platform === 'win32') {
   app.setAppUserModelId('Copilot Desktop');
 }
+
+// Auto-updater event handlers
+
+app.whenReady().then(() => {
+  createWindow(); // Ensure the main window is created
+  autoUpdater.checkForUpdatesAndNotify(); // Start checking for updates after window creation
+});
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for update...');
+});
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info);
+  if (win) {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Available',
+      message: `A new version (${info.version}) is available. It will be downloaded in the background.`,
+      buttons: ['OK']
+    });
+  }
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available:', info);
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Error in auto-updater:', err);
+});
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let log_message = "Download speed: " + progressObj.bytesPerSecond;
+  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+  log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+  console.log(log_message);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info);
+  if (win) {
+    dialog.showMessageBox(win, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'Update downloaded. The application will restart to apply the update.',
+      buttons: ['Restart Now', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  }
+});
 
 
 let tray = null;
@@ -153,11 +207,23 @@ function createWindow() {
         {
           label: 'Check for Updates',
           click: () => {
-            dialog.showMessageBox(win, {
-              type: 'info',
-              title: 'Check for Updates',
-              message: 'Auto-update is currently disabled.',
-              buttons: ['OK']
+            autoUpdater.checkForUpdatesAndNotify().then((result) => {
+              if (result === null) {
+                dialog.showMessageBox(win, {
+                  type: 'info',
+                  title: 'Check for Updates',
+                  message: 'You are running the latest version.',
+                  buttons: ['OK']
+                });
+              }
+            }).catch((error) => {
+              console.error('Error checking for updates:', error);
+              dialog.showMessageBox(win, {
+                type: 'error',
+                title: 'Update Check Failed',
+                message: 'Failed to check for updates. Please try again later.',
+                buttons: ['OK']
+              });
             });
           }
         }
@@ -300,6 +366,17 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  
+  // Check for updates after app is ready (but not during development)
+  if (!app.isPackaged) {
+    console.log('Development mode - skipping auto-update check');
+  } else {
+    // Check for updates 3 seconds after startup
+    setTimeout(() => {
+      autoUpdater.checkForUpdatesAndNotify();
+    }, 3000);
+  }
+  
   tray = new Tray(path.join(__dirname, 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show', click: () => {
