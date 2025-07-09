@@ -305,9 +305,9 @@ function createWindow() {
             if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
           });
           document.body.appendChild(toast);
-          setTimeout(() => {
-            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
-          }, 5000);
+        setTimeout(() => {
+          if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 15000);
         } catch (e) {}
       })();
 
