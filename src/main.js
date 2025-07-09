@@ -463,17 +463,19 @@ function createWindow() {
     `);
     event.preventDefault();
   }
-  // '/': Focus the chat input (only if not in a text input already)
+  // '/': Focus the chat input only if nothing is focused (body is active)
   if (input.key === '/' && !input.control && !input.meta && !input.shift && !input.alt) {
     win.webContents.executeJavaScript(`
       (function() {
         const ae = document.activeElement;
-        if (ae && ((ae.tagName === 'INPUT' && !ae.readOnly && ae.type !== 'checkbox' && ae.type !== 'button' && ae.type !== 'radio') || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+        if (ae && ae !== document.body) return false;
         const chatInput = document.querySelector('#copilot-chat-textarea');
-        if (chatInput) chatInput.focus();
+        if (chatInput) { chatInput.focus(); return true; }
+        return false;
       })();
-    `);
-    event.preventDefault();
+    `).then((didFocus) => {
+      if (didFocus) event.preventDefault();
+    });
   }
   // '`' or '~': Open Repositories... (only if not in a text input)
   if ((input.key === '`' || input.key === '~') && !input.control && !input.meta && !input.shift && !input.alt) {
