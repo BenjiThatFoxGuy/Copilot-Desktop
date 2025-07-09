@@ -463,14 +463,15 @@ function createWindow() {
     `);
     event.preventDefault();
   }
-  // '/': Focus the chat input only if nothing is focused (body is active)
+  // '/': Only focus chat input if body is focused, otherwise let slash type normally
   if (input.key === '/' && !input.control && !input.meta && !input.shift && !input.alt) {
     win.webContents.executeJavaScript(`
       (function() {
         const ae = document.activeElement;
-        if (ae && ae !== document.body) return false;
-        const chatInput = document.querySelector('#copilot-chat-textarea');
-        if (chatInput) { chatInput.focus(); return true; }
+        if (!ae || ae === document.body) {
+          const chatInput = document.querySelector('#copilot-chat-textarea');
+          if (chatInput) { chatInput.focus(); return true; }
+        }
         return false;
       })();
     `).then((didFocus) => {
