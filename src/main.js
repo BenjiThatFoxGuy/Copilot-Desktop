@@ -34,6 +34,8 @@ autoUpdater.on('update-not-available', (info) => {
 
 autoUpdater.on('error', (err) => {
   console.error('Error in auto-updater:', err);
+  // Quit the app on auto-update error
+  app.quit();
 });
 
 autoUpdater.on('download-progress', (progressObj) => {
@@ -223,6 +225,8 @@ function createWindow() {
                 message: 'Failed to check for updates. Please try again later.',
                 buttons: ['OK']
               });
+              // Quit the app on manual update failure
+              app.quit();
             });
           }
         }
