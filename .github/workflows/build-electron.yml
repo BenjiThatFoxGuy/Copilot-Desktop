@@ -1,4 +1,4 @@
-name: Build Electron App
+name: Build Electron App with Auto-Update
 
 
 
@@ -12,6 +12,49 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # New electron-builder based builds with auto-update support
+  build-with-autoupdate:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            command: npm run build:win
+          - os: macos-latest
+            platform: darwin
+            arch: universal
+            command: npm run build:mac
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: ${{ matrix.command }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-autoupdate
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/latest*.yml
+          retention-days: 5
+
+  # Legacy builds for backward compatibility
   build:
     runs-on: ${{ matrix.os }}
     strategy:
@@ -75,7 +118,7 @@ jobs:
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build-with-autoupdate, build]
     runs-on: ubuntu-latest
     steps:
       - name: Delete v0.0.1 release if present (for test/dev)
@@ -94,8 +137,11 @@ jobs:
         with:
           path: dist
 
-      - name: Move all zip files to dist root for release upload
+      - name: Move all files to dist root for release upload
         run: |
+          # Handle electron-builder generated files
+          find dist -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.yml" \) -exec mv {} dist/ \; || true
+          # Handle legacy zip files
           shopt -s globstar
           for f in dist/**/*.zip; do
             [ -f "$f" ] && mv "$f" dist/
@@ -103,24 +149,27 @@ jobs:
 
       - name: List files in dist for debugging
         run: |
-          echo "Listing all files in dist after moving zips:"
-          ls -lR dist
+          echo "Listing all files in dist after moving:"
+          ls -la dist/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            dist/Copilot-Desktop-linux.zip
-            dist/Copilot-Desktop-macos-arm64.zip
-            dist/Copilot-Desktop-macos-x64.zip
-            dist/Copilot-Desktop-win.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/latest*.yml
+          draft: false
+          prerelease: false
 
-  delete-artifacts:
+  cleanup:
     needs: release
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - uses: kolpav/purge-artifacts-action@v1
         with:
-          token: ${{ secrets.GH_TOKEN }}
-          expire-in: 0 # Setting this to 0 will delete all artifacts
+          token: ${{ secrets.GITHUB_TOKEN }}
+          expire-in: 0
