@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, dialog } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, Notification } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -17,6 +17,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, 'preload.js'),
     },
   });
 
@@ -52,19 +53,92 @@ function createWindow() {
   // Open any non-copilot links in the user's default browser
   const { shell } = require('electron');
 
+  // URLs that should be allowed to navigate in-app
+  const allowedUrls = [
+    'https://github.com/logout',
+    'https://github.com/session',
+    'https://github.com/login',
+    'https://github.com/copilot',
+  ];
+
   win.webContents.on('will-navigate', (event, url) => {
-    if (!url.startsWith('https://github.com/copilot')) {
+    if (
+      !url.startsWith('https://github.com/copilot') &&
+      !allowedUrls.some(allowed => url.startsWith(allowed))
+    ) {
       event.preventDefault();
       shell.openExternal(url);
     }
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://github.com/copilot')) {
+    if (
+      url.startsWith('https://github.com/copilot') ||
+      allowedUrls.some(allowed => url.startsWith(allowed))
+    ) {
       return { action: 'allow' };
     }
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Add Help menu with About and Check for Updates
+  const helpMenu = Menu.buildFromTemplate([
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About',
+          click: () => {
+            dialog.showMessageBox(win, {
+              type: 'info',
+              title: 'About',
+              message: 'Copilot Desktop\nUnofficial GUI for GitHub Copilot.\nhttps://github.com/copilot',
+              buttons: ['OK']
+            });
+          }
+        },
+        {
+          label: 'Check for Updates',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify();
+          }
+        }
+      ]
+    }
+  ]);
+  win.setMenu(Menu.buildFromTemplate([helpMenu.items[0]]));
+
+  // Inject JS to override Copilot title and show toast
+  win.webContents.on('did-finish-load', () => {
+    // 2. Override Copilot title
+    win.webContents.executeJavaScript(`
+      try {
+        const el = document.evaluate('/html/body/div[1]/div[1]/header/div/div[1]/context-region-controller/div/nav/context-region/context-region-crumb/a/span', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+        if (el) el.textContent = 'Copilot Desktop';
+      } catch (e) {}
+      // 3. Show GitHub-style toast
+      (function() {
+        if (document.getElementById('copilot-desktop-toast')) return;
+        const toast = document.createElement('div');
+        toast.id = 'copilot-desktop-toast';
+        toast.textContent = 'Press alt to summon the menubar';
+        toast.style.position = 'fixed';
+        toast.style.top = '20px';
+        toast.style.right = '20px';
+        toast.style.background = '#24292f';
+        toast.style.color = '#fff';
+        toast.style.padding = '12px 24px';
+        toast.style.borderRadius = '6px';
+        toast.style.fontFamily = 'inherit';
+        toast.style.fontSize = '16px';
+        toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+        toast.style.zIndex = 99999;
+        toast.style.opacity = '0.98';
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.remove(); }, 5000);
+      })();
+    `);
   });
 
   win.on('close', (event) => {
@@ -73,6 +147,16 @@ function createWindow() {
     } else {
       event.preventDefault();
       win.hide();
+      // 4. Native notification on hide
+      let msg = '';
+      if (process.platform === 'win32') {
+        msg = 'Copilot Desktop is still running. You can find me in the system tray.';
+      } else if (process.platform === 'darwin') {
+        msg = 'Copilot Desktop is still running. You can find me in the menu bar.';
+      } else {
+        msg = 'Copilot Desktop is still running. You can find me in the tray.';
+      }
+      new Notification({ title: 'Copilot Desktop', body: msg }).show();
     }
   });
 }
