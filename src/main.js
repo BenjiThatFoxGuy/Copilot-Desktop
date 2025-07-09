@@ -1,6 +1,10 @@
 const { app, BrowserWindow, Tray, Menu, dialog, Notification } = require('electron');
-const { autoUpdater } = require('electron-updater');
 const path = require('path');
+
+// Set appUserModelId for correct notification sender branding on Windows
+if (process.platform === 'win32') {
+  app.setAppUserModelId('Copilot Desktop');
+}
 
 
 let tray = null;
@@ -21,70 +25,117 @@ function createWindow() {
     },
   });
 
+  // Ensure external links open in the user's browser
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Open all non-Copilot and non-settings pages externally
+    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session')) {
+      require('electron').shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+  win.webContents.on('will-navigate', (event, url) => {
+    // Redirect GitHub homepage clicks back to Copilot
+    if (url === 'https://github.com/' || url === 'https://github.com') {
+      event.preventDefault();
+      win.loadURL('https://github.com/copilot');
+      return;
+    }
+    // Allow in-app navigation for Copilot and settings pages, external otherwise
+    if (!url.startsWith('https://github.com/copilot') && !url.startsWith('https://github.com/settings/copilot') && !url.startsWith('https://github.com/login') && !url.startsWith('https://github.com/logout') && !url.startsWith('https://github.com/session')) {
+      event.preventDefault();
+      require('electron').shell.openExternal(url);
+    }
+  });
+
 
   // Load GitHub Copilot web interface
   win.loadURL('https://github.com/copilot');
 
-  // Auto-updater logic
-  win.once('ready-to-show', () => {
-    autoUpdater.checkForUpdatesAndNotify();
-  });
 
-  autoUpdater.on('update-available', () => {
-    if (win) {
-      win.webContents.send('update_available');
-    }
-  });
+  // Set friendly app name for menubar and window
+  if (process.platform === 'darwin' && app.setName) {
+    app.setName('Copilot Desktop');
+  }
+  app.name = 'Copilot Desktop';
+  // Set window title
+  win.setTitle('Copilot Desktop');
 
-  autoUpdater.on('update-downloaded', () => {
-    if (win) {
-      win.webContents.send('update_downloaded');
-      dialog.showMessageBox(win, {
-        type: 'info',
-        title: 'Update Ready',
-        message: 'A new version has been downloaded. Restart to install?',
-        buttons: ['Restart', 'Later']
-      }).then(result => {
-        if (result.response === 0) autoUpdater.quitAndInstall();
-      });
-    }
-  });
-
-  // Open any non-copilot links in the user's default browser
-  const { shell } = require('electron');
-
-  // URLs that should be allowed to navigate in-app
-  const allowedUrls = [
-    'https://github.com/logout',
-    'https://github.com/session',
-    'https://github.com/login',
-    'https://github.com/copilot',
-  ];
-
-  win.webContents.on('will-navigate', (event, url) => {
-    if (
-      !url.startsWith('https://github.com/copilot') &&
-      !allowedUrls.some(allowed => url.startsWith(allowed))
-    ) {
-      event.preventDefault();
-      shell.openExternal(url);
-    }
-  });
-
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (
-      url.startsWith('https://github.com/copilot') ||
-      allowedUrls.some(allowed => url.startsWith(allowed))
-    ) {
-      return { action: 'allow' };
-    }
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  // Restore standard menubar and add Help
-  const defaultMenu = Menu.buildFromTemplate([
-    ...Menu.getApplicationMenu()?.items.map(item => item.toJSON()) || [],
+  // Custom menu bar with standard and custom Help
+  const menuTemplate = [
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Chat',
+          accelerator: 'CommandOrControl+N',
+          click: () => {
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin) {
+              focusedWin.webContents.executeJavaScript(
+                'document.querySelector("body > div.logged-in.env-production.page-responsive.copilotImmersive > div.application-main > main > react-app > div > div > div.Layout-module__left--LHTG3 > aside > div.Sidebar-module__header--uOLk8 > a").click();'
+              );
+            }
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'Copilot Settings',
+          accelerator: 'CommandOrControl+P',
+          click: () => {
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin) {
+              focusedWin.loadURL('https://github.com/settings/copilot/features');
+            }
+          }
+        },
+        {
+          label: 'Copilot Settings (Alt)',
+          accelerator: 'CommandOrControl+,',
+          click: () => {
+            const focusedWin = BrowserWindow.getFocusedWindow();
+            if (focusedWin) {
+              focusedWin.loadURL('https://github.com/settings/copilot/features');
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' }
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forcereload' },
+        { role: 'toggledevtools' },
+        { type: 'separator' },
+        { role: 'resetzoom' },
+        { role: 'zoomin' },
+        { role: 'zoomout' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    },
     {
       label: 'Help',
       submenu: [
@@ -102,85 +153,176 @@ function createWindow() {
         {
           label: 'Check for Updates',
           click: () => {
-            autoUpdater.checkForUpdatesAndNotify();
+            dialog.showMessageBox(win, {
+              type: 'info',
+              title: 'Check for Updates',
+              message: 'Auto-update is currently disabled.',
+              buttons: ['OK']
+            });
           }
         }
       ]
     }
-  ]);
-  Menu.setApplicationMenu(Menu.buildFromTemplate(defaultMenu));
-
-  // Set friendly window/taskbar title
-  win.setTitle('Copilot Desktop');
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate));
 
   // Inject JS to override Copilot title and show toast
   win.webContents.on('did-finish-load', () => {
     // 2. Override Copilot title
-    win.webContents.executeJavaScript(`
-      try {
-        const el = document.evaluate('/html/body/div[1]/div[1]/header/div/div[1]/context-region-controller/div/nav/context-region/context-region-crumb/a/span', document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
-        if (el) el.textContent = 'Copilot Desktop';
-      } catch (e) {}
-      // 3. Show GitHub-style toast
+    // Get app version from package.json for toast key
+    const appVersion = require(path.join(__dirname, '..', 'package.json')).version;
+      win.webContents.executeJavaScript(`
+      // Only override Copilot in the header using XPath and CSS path, with MutationObserver
+      function overrideHeader() {
+        // XPath override
+        const xpath = '/html/body/div[1]/div[1]/header/div/div[1]/context-region-controller/div/nav/context-region/context-region-crumb/a/span';
+        const xpathResult = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const xpathNode = xpathResult.singleNodeValue;
+        if (xpathNode && xpathNode.textContent && xpathNode.textContent.trim() === 'Copilot') {
+          xpathNode.textContent = 'Copilot Desktop';
+        }
+        // CSS path override
+        const cssSelector = 'html.js-focus-visible.mhmerdf.idc0_350.ftcocii body.logged-in.env-production.page-responsive.copilotImmersive div.logged-in.env-production.page-responsive.copilotImmersive div.position-relative.header-wrapper.js-header-wrapper header.AppHeader div.AppHeader-globalBar.js-global-bar div.AppHeader-globalBar-start.responsive-context-region context-region-controller.AppHeader-context.responsive-context-region div.AppHeader-context-full nav context-region context-region-crumb a#dynamic-crumb-620f6yr-copilot-link.AppHeader-context-item span.AppHeader-context-item-label';
+        const cssNode = document.querySelector(cssSelector);
+        if (cssNode && cssNode.textContent && cssNode.textContent.trim() === 'Copilot') {
+          cssNode.textContent = 'Copilot Desktop';
+        }
+      }
+      overrideHeader();
+      // Observe DOM changes to keep overriding as soon as the element appears
+      const observer = new MutationObserver(() => {
+        overrideHeader();
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+      // 3. Remove unwanted elements by selector
+      function removeBySelector(sel) {
+        const el = document.querySelector(sel);
+        if (el) el.remove();
+      }
+      removeBySelector('.AppHeader-search');
+      removeBySelector('.AppHeader-actions');
+      removeBySelector('body > div.logged-in.env-production.page-responsive.copilotImmersive > div.position-relative.header-wrapper.js-header-wrapper > header > div > div.AppHeader-globalBar-end > notification-indicator');
+      removeBySelector('body > div.logged-in.env-production.page-responsive.copilotImmersive > div.position-relative.header-wrapper.js-header-wrapper > header > div > div.AppHeader-globalBar-start.responsive-context-region > div');
+
+      // 3.5 Override GitHub logo click to redirect to /copilot
+      (function(){
+        const logoLink = document.querySelector('header a[href="/"], header a[href="https://github.com/"]');
+        if (logoLink) {
+          logoLink.setAttribute('href', '/copilot');
+          logoLink.addEventListener('click', e => {
+            e.preventDefault();
+            window.location.href = '/copilot';
+          });
+        }
+      })();
+
+      // 4. Show GitHub-style toast only once per app version, dismissible on click
       (function() {
-        if (document.getElementById('copilot-desktop-toast')) return;
-        const toast = document.createElement('div');
-        toast.id = 'copilot-desktop-toast';
-        toast.textContent = 'Press alt to summon the menubar';
-        toast.style.position = 'fixed';
-        toast.style.top = '20px';
-        toast.style.right = '20px';
-        toast.style.background = '#24292f';
-        toast.style.color = '#fff';
-        toast.style.padding = '12px 24px';
-        toast.style.borderRadius = '6px';
-        toast.style.fontFamily = 'inherit';
-        toast.style.fontSize = '16px';
-        toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-        toast.style.zIndex = 99999;
-        toast.style.opacity = '0.98';
-        document.body.appendChild(toast);
-        setTimeout(() => { toast.remove(); }, 5000);
+        try {
+          // Only show toast once per version
+          const versionKey = 'copilot-desktop-toast-v${appVersion}';
+          if (localStorage.getItem(versionKey)) return;
+          localStorage.setItem(versionKey, '1');
+          const toast = document.createElement('div');
+          toast.id = 'copilot-desktop-toast';
+          toast.innerHTML = 'Press <span style="display:inline-block;background:#212830;color:#fff;border-radius:3px;padding:2px 8px;font-weight:bold;font-family:monospace;margin:0 2px;box-shadow:0 1px 2px rgba(0,0,0,0.08);vertical-align:middle;outline:2px solid #353b44;outline-offset:0;">Alt</span> to summon the menubar';
+          toast.style.position = 'fixed';
+          toast.style.bottom = '20px';
+          toast.style.right = '20px';
+          toast.style.background = '#161A21';
+          toast.style.color = '#fff';
+          toast.style.padding = '12px 24px';
+          toast.style.borderRadius = '6px';
+          toast.style.fontFamily = 'inherit';
+          toast.style.fontSize = '16px';
+          toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+          toast.style.zIndex = 99999;
+          toast.style.opacity = '0.98';
+          toast.style.cursor = 'pointer';
+          toast.title = 'Click to dismiss';
+          toast.addEventListener('click', () => {
+            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+          });
+          document.body.appendChild(toast);
+          setTimeout(() => {
+            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+          }, 5000);
+        } catch (e) {}
+      })();
+
+      // 5. Render a back button overlay when not on /copilot
+      (function() {
+        const btnId = 'copilot-back-button';
+        if (document.getElementById(btnId)) return;
+        if (!location.pathname.startsWith('/copilot')) {
+          const btn = document.createElement('button');
+          btn.id = btnId;
+          btn.textContent = '← Back';
+          btn.style.position = 'fixed';
+          btn.style.bottom = '10px';
+          btn.style.right = '10px';
+          btn.style.padding = '6px 12px';
+          btn.style.background = '#161A21';
+          btn.style.color = '#fff';
+          btn.style.border = 'none';
+          btn.style.borderRadius = '4px';
+          btn.style.cursor = 'pointer';
+          btn.style.zIndex = '100000';
+          btn.addEventListener('click', () => history.back());
+          document.body.appendChild(btn);
+        }
       })();
     `);
   });
 
   win.on('close', (event) => {
-    if (app.quitting) {
-      win = null;
-    } else {
+    if (!app.quitting) {
       event.preventDefault();
       win.hide();
-      // 4. Native notification on hide
-      let msg = '';
-      let notifTitle = 'Copilot Desktop';
+      // Notify user that app is still running in tray
+      const notifTitle = 'Copilot Desktop';
+      let bodyMsg;
       if (process.platform === 'win32') {
-        msg = 'Copilot Desktop is still running. You can find me in the system tray.';
+        bodyMsg = `${notifTitle} is still running. You can find me in the system tray.`;
       } else if (process.platform === 'darwin') {
-        msg = 'Copilot Desktop is still running. You can find me in the menu bar.';
+        bodyMsg = `${notifTitle} is still running. You can find me in the menu bar.`;
       } else {
-        msg = 'Copilot Desktop is still running. You can find me in the tray.';
+        bodyMsg = `${notifTitle} is still running. You can find me in the tray.`;
       }
-      new Notification({ title: notifTitle, body: msg }).show();
+      new Notification({
+        title: notifTitle,
+        body: bodyMsg,
+        icon: path.join(__dirname, 'icon.ico'),
+      }).show();
     }
   });
 }
-
 
 app.whenReady().then(() => {
   createWindow();
   tray = new Tray(path.join(__dirname, 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Show', click: () => { win.show(); } },
+    { label: 'Show', click: () => {
+        if (win) {
+          win.show();
+          win.focus();
+        }
+      }
+    },
     { label: 'Quit', click: () => {
-      app.quitting = true;
-      app.quit();
-    } }
+        app.quitting = true;
+        app.quit();
+      }
+    }
   ]);
   tray.setToolTip('Copilot Desktop');
   tray.setContextMenu(contextMenu);
-  tray.on('double-click', () => {
-    win.show();
+  // Show window on single click of the tray icon
+  tray.on('click', () => {
+    if (win) {
+      win.show();
+      win.focus();
+    }
   });
 });
 
