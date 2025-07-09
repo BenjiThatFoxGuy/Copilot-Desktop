@@ -9,9 +9,6 @@ if (process.platform === 'win32') {
 
 // Auto-updater event handlers
 
-app.whenReady().then(() => {
-  autoUpdater.checkForUpdatesAndNotify(); // Start checking for updates after window creation
-});
 autoUpdater.on('checking-for-update', () => {
   console.log('Checking for update...');
 });
@@ -397,15 +394,9 @@ app.whenReady().then(() => {
       win.focus();
     }
   });
-  // Check for updates after app is ready (but not during development)
-  if (!app.isPackaged) {
-    console.log('Development mode - skipping auto-update check');
-  } else {
-    // Check for updates and then quit the app to allow updater to proceed
-    setTimeout(() => {
-      autoUpdater.checkForUpdatesAndNotify();
-      app.quit();
-    }, 3000);
+  // Auto-update on startup (packaged only)
+  if (app.isPackaged) {
+    autoUpdater.checkForUpdatesAndNotify();
   }
 });
 
