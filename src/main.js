@@ -37,6 +37,7 @@ autoUpdater.on('update-not-available', (info) => {
 autoUpdater.on('error', (err) => {
   console.error('Error in auto-updater:', err);
   // Quit the app on auto-update error
+  app.quitting = true;
   app.quit();
 });
 
@@ -57,6 +58,7 @@ autoUpdater.on('update-downloaded', (info) => {
       buttons: ['Restart Now', 'Later']
     }).then((result) => {
       if (result.response === 0) {
+        app.quitting = true;
         autoUpdater.quitAndInstall();
       }
     });
