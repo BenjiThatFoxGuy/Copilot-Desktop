@@ -264,12 +264,32 @@ function createWindow() {
         const xpathNode = xpathResult.singleNodeValue;
         if (xpathNode && xpathNode.textContent && xpathNode.textContent.trim() === 'Copilot') {
           xpathNode.textContent = 'Copilot Desktop';
+          // Remove href from parent link or make it reload Copilot
+          const parentLink = xpathNode.closest('a');
+          if (parentLink) {
+            parentLink.removeAttribute('href');
+            parentLink.style.cursor = 'pointer';
+            parentLink.addEventListener('click', function(e) {
+              e.preventDefault();
+              window.location.href = '/copilot';
+            }, { once: true });
+          }
         }
         // CSS path override
         const cssSelector = 'html.js-focus-visible.mhmerdf.idc0_350.ftcocii body.logged-in.env-production.page-responsive.copilotImmersive div.logged-in.env-production.page-responsive.copilotImmersive div.position-relative.header-wrapper.js-header-wrapper header.AppHeader div.AppHeader-globalBar.js-global-bar div.AppHeader-globalBar-start.responsive-context-region context-region-controller.AppHeader-context.responsive-context-region div.AppHeader-context-full nav context-region context-region-crumb a#dynamic-crumb-620f6yr-copilot-link.AppHeader-context-item span.AppHeader-context-item-label';
         const cssNode = document.querySelector(cssSelector);
         if (cssNode && cssNode.textContent && cssNode.textContent.trim() === 'Copilot') {
           cssNode.textContent = 'Copilot Desktop';
+          // Remove href from parent link or make it reload Copilot
+          const parentLink = cssNode.closest('a');
+          if (parentLink) {
+            parentLink.removeAttribute('href');
+            parentLink.style.cursor = 'pointer';
+            parentLink.addEventListener('click', function(e) {
+              e.preventDefault();
+              window.location.href = '/copilot';
+            }, { once: true });
+          }
         }
       }
       overrideHeader();
