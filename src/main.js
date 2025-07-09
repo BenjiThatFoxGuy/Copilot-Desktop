@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Tray, Menu } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
 
@@ -22,6 +23,31 @@ function createWindow() {
 
   // Load GitHub Copilot web interface
   win.loadURL('https://github.com/copilot');
+
+  // Auto-updater logic
+  win.once('ready-to-show', () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
+  autoUpdater.on('update-available', () => {
+    if (win) {
+      win.webContents.send('update_available');
+    }
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    if (win) {
+      win.webContents.send('update_downloaded');
+      dialog.showMessageBox(win, {
+        type: 'info',
+        title: 'Update Ready',
+        message: 'A new version has been downloaded. Restart to install?',
+        buttons: ['Restart', 'Later']
+      }).then(result => {
+        if (result.response === 0) autoUpdater.quitAndInstall();
+      });
+    }
+  });
 
   // Open any non-copilot links in the user's default browser
   const { shell } = require('electron');
