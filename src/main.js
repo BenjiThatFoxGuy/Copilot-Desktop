@@ -8,6 +8,22 @@ if (process.platform === 'win32') {
   app.setAppUserModelId('Copilot Desktop');
 }
 
+// Single instance lock - prevent multiple instances from running
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    // Someone tried to run a second instance, we should focus our window instead
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+    }
+  });
+}
+
 // Auto-updater event handlers
 
 autoUpdater.on('checking-for-update', () => {
