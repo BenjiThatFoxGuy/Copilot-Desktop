@@ -196,9 +196,30 @@ function showDesktopSettingsDialog() {
       <div class="setting">
         <label>
           Global hotkey to summon app:
-          <input type="text" id="globalHotkey" value="${appSettings.globalHotkey}" placeholder="CommandOrControl+Shift+C">
+          <div style="display: flex; align-items: center; margin-left: 10px;">
+            <button type="button" id="hotkeyButton" style="
+              padding: 8px 12px; 
+              background: #161b22; 
+              border: 1px solid #30363d; 
+              border-radius: 4px; 
+              color: #f0f6fc; 
+              cursor: pointer;
+              min-width: 200px;
+              text-align: left;
+            ">${appSettings.globalHotkey}</button>
+            <button type="button" id="clearHotkey" style="
+              padding: 8px 12px; 
+              background: #da3633; 
+              border: 1px solid #f85149; 
+              border-radius: 4px; 
+              color: white; 
+              cursor: pointer;
+              margin-left: 8px;
+            ">Clear</button>
+          </div>
+          <input type="hidden" id="globalHotkey" value="${appSettings.globalHotkey}">
         </label>
-        <div class="description">Press this key combination to show and focus the app from anywhere</div>
+        <div class="description">Press this key combination to show and focus the app from anywhere. Click the button above and press your desired key combination.</div>
       </div>
       
       <div class="buttons">
@@ -207,11 +228,99 @@ function showDesktopSettingsDialog() {
       </div>
       
       <script>
+        let isCapturingHotkey = false;
+        
+        // Convert key event to Electron accelerator format
+        function eventToAccelerator(event) {
+          const parts = [];
+          
+          if (event.ctrlKey || event.metaKey) {
+            parts.push('CommandOrControl');
+          }
+          if (event.altKey) {
+            parts.push('Alt');
+          }
+          if (event.shiftKey) {
+            parts.push('Shift');
+          }
+          
+          // Map key codes to proper names
+          let key = event.key;
+          if (key === ' ') key = 'Space';
+          else if (key === 'ArrowUp') key = 'Up';
+          else if (key === 'ArrowDown') key = 'Down';
+          else if (key === 'ArrowLeft') key = 'Left';
+          else if (key === 'ArrowRight') key = 'Right';
+          else if (key === 'Escape') key = 'Esc';
+          else if (key === 'Delete') key = 'Delete';
+          else if (key === 'Backspace') key = 'Backspace';
+          else if (key === 'Tab') key = 'Tab';
+          else if (key === 'Enter') key = 'Return';
+          else if (/^F\d+$/.test(key)) {
+            // Function keys are already in correct format
+          } else if (key.length === 1) {
+            key = key.toUpperCase();
+          }
+          
+          // Don't include modifier keys as the main key
+          if (['Control', 'Meta', 'Alt', 'Shift'].includes(key)) {
+            return null;
+          }
+          
+          parts.push(key);
+          return parts.join('+');
+        }
+        
+        document.getElementById('hotkeyButton').addEventListener('click', function() {
+          if (isCapturingHotkey) return;
+          
+          isCapturingHotkey = true;
+          this.textContent = 'Press key combination...';
+          this.style.background = '#0969da';
+          
+          const handleKeyDown = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            
+            const accelerator = eventToAccelerator(event);
+            if (accelerator) {
+              document.getElementById('globalHotkey').value = accelerator;
+              this.textContent = accelerator;
+              this.style.background = '#161b22';
+              isCapturingHotkey = false;
+              document.removeEventListener('keydown', handleKeyDown, true);
+            }
+          };
+          
+          document.addEventListener('keydown', handleKeyDown, true);
+          
+          // Cancel capture on click outside or escape
+          const cancelCapture = () => {
+            this.textContent = document.getElementById('globalHotkey').value;
+            this.style.background = '#161b22';
+            isCapturingHotkey = false;
+            document.removeEventListener('keydown', handleKeyDown, true);
+          };
+          
+          // Auto-cancel after 10 seconds
+          setTimeout(() => {
+            if (isCapturingHotkey) {
+              cancelCapture();
+            }
+          }, 10000);
+        });
+        
+        document.getElementById('clearHotkey').addEventListener('click', function() {
+          document.getElementById('globalHotkey').value = '';
+          document.getElementById('hotkeyButton').textContent = 'None - Click to set';
+        });
+        
         function saveSettings() {
+          const hotkeyValue = document.getElementById('globalHotkey').value.trim();
           const settings = {
             showTrayNotification: document.getElementById('showTrayNotification').checked,
             startWithWindows: document.getElementById('startWithWindows').checked,
-            globalHotkey: document.getElementById('globalHotkey').value.trim() || 'CommandOrControl+Shift+C'
+            globalHotkey: hotkeyValue || 'CommandOrControl+Shift+C'
           };
           
           window.electronAPI.saveSettings(settings);
@@ -799,6 +908,25 @@ ipcMain.on('save-settings', (event, newSettings) => {
   
   // Update auto-start
   setupAutoStart();
+  
+  // Ask user to restart the app for changes to fully take effect
+  const settingsWindow = BrowserWindow.fromWebContents(event.sender);
+  if (settingsWindow) {
+    dialog.showMessageBox(settingsWindow, {
+      type: 'question',
+      title: 'Restart Required',
+      message: 'Settings have been saved. Some changes may require a restart to take full effect.',
+      detail: 'Would you like to restart Copilot Desktop now?',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1
+    }).then((result) => {
+      if (result.response === 0) {
+        app.relaunch();
+        app.exit(0);
+      }
+    });
+  }
 });
 
 app.whenReady().then(() => {
