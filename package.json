@@ -14,7 +14,7 @@
   },
   "scripts": {
     "start": "electron .",
-    "test": "node test/test-main.js && node test/test-single-instance.js",
+    "test": "node test/test-main.js && node test/test-single-instance.js && node test/test-settings.js",
     "verify": "node test/verify-autoupdate.js",
     "build": "electron-builder",
     "build:win": "electron-builder --win",
