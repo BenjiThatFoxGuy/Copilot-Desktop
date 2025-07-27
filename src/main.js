@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Tray, Menu, dialog, Notification, ipcMain } = require('electron');
+const { app, BrowserWindow, Tray, Menu, dialog, Notification, ipcMain, globalShortcut } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 const fs = require('fs');
@@ -7,6 +7,226 @@ const fs = require('fs');
 if (process.platform === 'win32') {
   app.setAppUserModelId('Copilot Desktop');
 }
+
+// Settings management
+const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+let appSettings = {
+  showTrayNotification: true,
+  startWithWindows: false,
+  globalHotkey: 'CommandOrControl+Shift+C'
+};
+
+// Track if tray notification has been shown this session
+let trayNotificationShown = false;
+
+function loadSettings() {
+  try {
+    if (fs.existsSync(settingsPath)) {
+      const data = fs.readFileSync(settingsPath, 'utf8');
+      appSettings = { ...appSettings, ...JSON.parse(data) };
+    }
+  } catch (error) {
+    console.error('Error loading settings:', error);
+  }
+}
+
+function saveSettings() {
+  try {
+    fs.writeFileSync(settingsPath, JSON.stringify(appSettings, null, 2));
+  } catch (error) {
+    console.error('Error saving settings:', error);
+  }
+}
+
+function setupGlobalHotkey() {
+  // Clear existing hotkey
+  globalShortcut.unregisterAll();
+  
+  if (appSettings.globalHotkey) {
+    try {
+      globalShortcut.register(appSettings.globalHotkey, () => {
+        if (win) {
+          if (win.isMinimized()) win.restore();
+          win.show();
+          win.focus();
+        }
+      });
+    } catch (error) {
+      console.error('Error registering global hotkey:', error);
+    }
+  }
+}
+
+function setupAutoStart() {
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    app.setLoginItemSettings({
+      openAtLogin: appSettings.startWithWindows
+    });
+  }
+}
+
+function showSettingsChoiceDialog() {
+  if (!win) return;
+  
+  dialog.showMessageBox(win, {
+    type: 'question',
+    title: 'Open Settings',
+    message: 'Which settings would you like to open?',
+    buttons: ['Copilot Settings', 'Copilot Desktop Settings', 'Cancel'],
+    defaultId: 0,
+    cancelId: 2
+  }).then((result) => {
+    if (result.response === 0) {
+      // Open Copilot Settings
+      win.loadURL('https://github.com/settings/copilot/features');
+    } else if (result.response === 1) {
+      // Open Copilot Desktop Settings
+      showDesktopSettingsDialog();
+    }
+  });
+}
+
+function showDesktopSettingsDialog() {
+  if (!win) return;
+  
+  const settingsWindow = new BrowserWindow({
+    width: 500,
+    height: 400,
+    parent: win,
+    modal: true,
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, 'icon.ico'),
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    }
+  });
+  
+  // Create settings HTML content
+  const settingsHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Copilot Desktop Settings</title>
+      <style>
+        body { 
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          margin: 20px; 
+          background: #0d1117; 
+          color: #f0f6fc; 
+        }
+        .setting { 
+          margin: 20px 0; 
+          padding: 15px; 
+          border: 1px solid #30363d; 
+          border-radius: 6px; 
+          background: #161b22; 
+        }
+        .setting label { 
+          display: flex; 
+          align-items: center; 
+          cursor: pointer; 
+        }
+        .setting input[type="checkbox"] { 
+          margin-right: 10px; 
+        }
+        .setting input[type="text"] { 
+          width: 200px; 
+          padding: 5px; 
+          margin-left: 10px; 
+          background: #0d1117; 
+          border: 1px solid #30363d; 
+          border-radius: 4px; 
+          color: #f0f6fc; 
+        }
+        .buttons { 
+          margin-top: 30px; 
+          text-align: center; 
+        }
+        .btn { 
+          padding: 8px 16px; 
+          margin: 0 5px; 
+          border: 1px solid #f85149; 
+          border-radius: 6px; 
+          background: #da3633; 
+          color: white; 
+          cursor: pointer; 
+        }
+        .btn:hover { 
+          background: #f85149; 
+        }
+        .btn.secondary { 
+          background: #21262d; 
+          border-color: #30363d; 
+        }
+        .btn.secondary:hover { 
+          background: #30363d; 
+        }
+        h1 { 
+          color: #58a6ff; 
+          margin-bottom: 20px; 
+        }
+        .description { 
+          font-size: 12px; 
+          color: #8b949e; 
+          margin-top: 5px; 
+        }
+      </style>
+    </head>
+    <body>
+      <h1>Copilot Desktop Settings</h1>
+      
+      <div class="setting">
+        <label>
+          <input type="checkbox" id="showTrayNotification" ${appSettings.showTrayNotification ? 'checked' : ''}>
+          Show notification when minimized to tray
+        </label>
+        <div class="description">Display a notification when the app is minimized to the system tray (only shows once per session)</div>
+      </div>
+      
+      <div class="setting">
+        <label>
+          <input type="checkbox" id="startWithWindows" ${appSettings.startWithWindows ? 'checked' : ''}>
+          Start with Windows
+        </label>
+        <div class="description">Automatically start Copilot Desktop when Windows starts</div>
+      </div>
+      
+      <div class="setting">
+        <label>
+          Global hotkey to summon app:
+          <input type="text" id="globalHotkey" value="${appSettings.globalHotkey}" placeholder="CommandOrControl+Shift+C">
+        </label>
+        <div class="description">Press this key combination to show and focus the app from anywhere</div>
+      </div>
+      
+      <div class="buttons">
+        <button class="btn" onclick="saveSettings()">Save</button>
+        <button class="btn secondary" onclick="window.close()">Cancel</button>
+      </div>
+      
+      <script>
+        function saveSettings() {
+          const settings = {
+            showTrayNotification: document.getElementById('showTrayNotification').checked,
+            startWithWindows: document.getElementById('startWithWindows').checked,
+            globalHotkey: document.getElementById('globalHotkey').value.trim() || 'CommandOrControl+Shift+C'
+          };
+          
+          window.electronAPI.saveSettings(settings);
+          window.close();
+        }
+      </script>
+    </body>
+    </html>
+  `;
+  
+  settingsWindow.loadURL('data:text/html,' + encodeURIComponent(settingsHTML));
+}
+
+// Load settings on startup
+loadSettings();
 
 // Single instance lock - prevent multiple instances from running
 const gotTheLock = app.requestSingleInstanceLock();
@@ -154,23 +374,17 @@ function createWindow() {
         },
         { type: 'separator' },
         {
-          label: 'Copilot Settings',
+          label: 'Settings...',
           accelerator: 'CommandOrControl+P',
           click: () => {
-            const focusedWin = BrowserWindow.getFocusedWindow();
-            if (focusedWin) {
-              focusedWin.loadURL('https://github.com/settings/copilot/features');
-            }
+            showSettingsChoiceDialog();
           }
         },
         {
-          label: 'Copilot Settings (Alt)',
+          label: 'Settings... (Alt)',
           accelerator: 'CommandOrControl+,',
           click: () => {
-            const focusedWin = BrowserWindow.getFocusedWindow();
-            if (focusedWin) {
-              focusedWin.loadURL('https://github.com/settings/copilot');
-            }
+            showSettingsChoiceDialog();
           }
         },
         {
@@ -543,21 +757,25 @@ function createWindow() {
     if (!app.quitting) {
       event.preventDefault();
       win.hide();
-      // Notify user that app is still running in tray
-      const notifTitle = 'Copilot Desktop';
-      let bodyMsg;
-      if (process.platform === 'win32') {
-        bodyMsg = `${notifTitle} is still running. You can find me in the system tray.`;
-      } else if (process.platform === 'darwin') {
-        bodyMsg = `${notifTitle} is still running. You can find me in the menu bar.`;
-      } else {
-        bodyMsg = `${notifTitle} is still running. You can find me in the tray.`;
+      
+      // Show notification only if enabled, and only once per session
+      if (appSettings.showTrayNotification && !trayNotificationShown) {
+        trayNotificationShown = true;
+        const notifTitle = 'Copilot Desktop';
+        let bodyMsg;
+        if (process.platform === 'win32') {
+          bodyMsg = `${notifTitle} is still running. You can find me in the system tray.`;
+        } else if (process.platform === 'darwin') {
+          bodyMsg = `${notifTitle} is still running. You can find me in the menu bar.`;
+        } else {
+          bodyMsg = `${notifTitle} is still running. You can find me in the tray.`;
+        }
+        new Notification({
+          title: notifTitle,
+          body: bodyMsg,
+          icon: path.join(__dirname, 'icon.ico'),
+        }).show();
       }
-      new Notification({
-        title: notifTitle,
-        body: bodyMsg,
-        icon: path.join(__dirname, 'icon.ico'),
-      }).show();
     }
   });
 }
@@ -571,11 +789,31 @@ ipcMain.on('logo-context-menu', (event) => {
   menu.popup({ window: BrowserWindow.fromWebContents(event.sender) });
 });
 
+// Handle settings save
+ipcMain.on('save-settings', (event, newSettings) => {
+  appSettings = { ...appSettings, ...newSettings };
+  saveSettings();
+  
+  // Update global hotkey
+  setupGlobalHotkey();
+  
+  // Update auto-start
+  setupAutoStart();
+});
+
 app.whenReady().then(() => {
   createWindow();
+  
+  // Setup global hotkey and auto-start
+  setupGlobalHotkey();
+  setupAutoStart();
+  
   tray = new Tray(path.join(__dirname, 'icon.ico'));
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Show', click: () => { if (win) { win.show(); win.focus(); } } },
+    { type: 'separator' },
+    { label: 'Settings...', click: () => { showSettingsChoiceDialog(); } },
+    { type: 'separator' },
     { label: 'Restart', click: () => { app.relaunch(); app.exit(0); } },
     { label: 'Clear User Data', click: () => { fs.rmSync(app.getPath('userData'), { recursive: true, force: true }); app.relaunch(); app.exit(0); } },
     { type: 'separator' },
@@ -607,4 +845,9 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+app.on('will-quit', () => {
+  // Cleanup global shortcuts
+  globalShortcut.unregisterAll();
 });

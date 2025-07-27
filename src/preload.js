@@ -4,6 +4,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  openLogoContextMenu: () => ipcRenderer.send('logo-context-menu')
+  openLogoContextMenu: () => ipcRenderer.send('logo-context-menu'),
+  saveSettings: (settings) => ipcRenderer.send('save-settings', settings)
 });
 // Add more secure APIs as needed
